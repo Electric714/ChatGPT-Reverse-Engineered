@@ -13,8 +13,9 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set Xcode Version
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+      - name: Select Default Xcode
+        # This resets the path to the system default, which always exists
+        run: sudo xcode-select --reset
 
       - name: Build Unsigned App
         run: |
@@ -32,8 +33,8 @@ jobs:
       - name: Create Payload and IPA
         run: |
           mkdir -p Payload
-          # Note: Ensure 'ChatGPT.app' matches the actual name produced by the build
-          cp -r build/Build/Products/Release-iphoneos/*.app Payload/
+          # This copy command is now more robust to catch whatever .app file is built
+          find build/Build/Products/Release-iphoneos -name "*.app" -exec cp -r {} Payload/ \;
           zip -r ChatGPT-Reverse-Unsigned.ipa Payload
           rm -rf Payload
 
