@@ -1,0 +1,44 @@
+name: Build Unsigned IPA (Reverse Engineered)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Build Unsigned App
+        run: |
+          xcodebuild clean build \
+            -project ChatGPT.xcodeproj \
+            -scheme ChatGPT \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Create Payload and IPA
+        run: |
+          mkdir -p Payload
+          # Note: Ensure 'ChatGPT.app' matches the actual name produced by the build
+          cp -r build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r ChatGPT-Reverse-Unsigned.ipa Payload
+          rm -rf Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChatGPT-Unsigned-IPA
+          path: ChatGPT-Reverse-Unsigned.ipa
