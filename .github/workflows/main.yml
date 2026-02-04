@@ -1,4 +1,4 @@
-name: Build Unsigned IPA (Reverse Engineered)
+name: Build Unsigned IPA
 
 on:
   push:
@@ -13,33 +13,49 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Select Default Xcode
-        # This resets the path to the system default, which always exists
+      - name: Select Xcode
         run: sudo xcode-select --reset
 
-      - name: Build Unsigned App
+      - name: Auto-Detect and Build
         run: |
+          # 1. Find the project file anywhere in the repo
+          PROJECT_PATH=$(find . -name "*.xcodeproj" -print -quit)
+          
+          if [ -z "$PROJECT_PATH" ]; then
+            echo "ERROR: No .xcodeproj found in the repository!"
+            ls -R
+            exit 1
+          fi
+
+          echo "Found Project: $PROJECT_PATH"
+
+          # 2. Get the first available Scheme
+          SCHEME_NAME=$(xcodebuild -list -project "$PROJECT_PATH" | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | xargs | awk '{print $1}')
+          
+          echo "Using Scheme: $SCHEME_NAME"
+
+          # 3. Execute the build
           xcodebuild clean build \
-            -project ChatGPT.xcodeproj \
-            -scheme ChatGPT \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME_NAME" \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath build \
+            -derivedDataPath build_output \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-      - name: Create Payload and IPA
+      - name: Package into IPA
         run: |
           mkdir -p Payload
-          # This copy command is now more robust to catch whatever .app file is built
-          find build/Build/Products/Release-iphoneos -name "*.app" -exec cp -r {} Payload/ \;
-          zip -r ChatGPT-Reverse-Unsigned.ipa Payload
+          # Find the .app file in the build output and copy it
+          find build_output/Build/Products/Release-iphoneos -name "*.app" -exec cp -r {} Payload/ \;
+          zip -r App-Unsigned.ipa Payload
           rm -rf Payload
 
-      - name: Upload Artifact
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ChatGPT-Unsigned-IPA
-          path: ChatGPT-Reverse-Unsigned.ipa
+          name: Unsigned-IPA
+          path: App-Unsigned.ipa
